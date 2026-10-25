@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>ペンギンVSパンダ 天候バトル</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{
+margin:0;height:100%;overflow:hidden;
+font-family:sans-serif;background:#111;color:#fff;
+touch-action:none;
+}
+.screen{
+display:none;flex-direction:column;
+justify-content:center;align-items:center;
+width:100%;height:100%;padding:15px;text-align:center;
+}
+.active{display:flex;}
+button{
+border:none;
+border-radius:16px;
+padding:16px 24px;
+font-size:22px;
+font-weight:bold;
+min-width:200px;
+}
+#startBtn,#retryBtn{background:#ffd54f;color:#000;}
+#gameScreen{padding:0;justify-content:flex-start;}
+#hud{
+width:100%;
+display:flex;
+justify-content:space-between;
+padding:10px;
+font-size:20px;
+font-weight:bold;
+background:#000;
+}
+#arena{
+position:relative;
+width:100%;
+flex:1;
+overflow:hidden;
+background:linear-gradient(#2962ff,#1b5e20);
+}
+#weather{
+font-size:22px;
+padding:6px;
+font-weight:bold;
+background:#0008;
+}
+#penguin,#panda{
+position:absolute;
+font-size:90px;
+}
+#penguin{left:8%;bottom:15%;}
+#panda{right:8%;top:15%;}
+#message{
+position:absolute;
+left:50%;
+top:48%;
+transform:translate(-50%,-50%);
+font-size:34px;
+font-weight:bold;
+text-shadow:0 0 10px #000;
+width:95%;
+}
+#hint{
+position:absolute;
+left:50%;
+top:63%;
+transform:translateX(-50%);
+font-size:20px;
+font-weight:bold;
+color:#fff176;
+}
+#controls{
+display:flex;
+gap:10px;
+width:100%;
+padding:10px;
+background:#111;
+}
+.ctrl{
+flex:1;
+height:90px;
+font-size:28px;
+font-weight:bold;
+}
+#attack{background:#e53935;color:#fff;}
+#guard{background:#1e88e5;color:#fff;}
+.rank{
+font-size:60px;
+color:gold;
+}
+</style>
+</head>
+<body>
+
+<div id="startScreen" class="screen active">
+<h1>🐧ペンギンVS🐼パンダ</h1>
+<p>
+30秒の超反射バトル！<br><br>
+🟥「いまだ！攻撃！」が出たら攻撃ボタン！<br>
+🟦「あぶない！防御！」が出たら防御ボタン！<br>
+違うボタンを押すと減点！<br>
+天気によって得点が変化！
+</p>
+<button id="startBtn">スタート</button>
+</div>
+
+<div id="gameScreen" class="screen">
+<div id="hud">
+<div>スコア:<span id="score">0</span></div>
+<div>残り:<span id="time">30</span>秒</div>
+</div>
+
+<div id="weather">☀️ 晴れ</div>
+
+<div id="arena">
+<div id="penguin">🐧</div>
+<div id="panda">🐼</div>
+
+<div id="message">開始！</div>
+<div id="hint"></div>
+</div>
+
+<div id="controls">
+<button id="attack" class="ctrl">⚔️攻撃</button>
+<button id="guard" class="ctrl">🛡️防御</button>
+</div>
+</div>
+
+<div id="resultScreen" class="screen">
+<h1>結果発表</h1>
+<div style="font-size:50px" id="finalScore">0</div>
+<div id="rank" class="rank">C</div>
+<button id="retryBtn">もう一度遊ぶ</button>
+</div>
+
+<script>
+const startScreen=document.getElementById("startScreen");
+const gameScreen=document.getElementById("gameScreen");
+const resultScreen=document.getElementById("resultScreen");
+
+const scoreEl=document.getElementById("score");
+const timeEl=document.getElementById("time");
+const msg=document.getElementById("message");
+const hint=document.getElementById("hint");
+const weatherEl=document.getElementById("weather");
+
+let score=0;
+let time=30;
+let gameActive=false;
+let action="none";
+let timer,eventTimer;
+let attackPoint=25;
+let guardPoint=20;
+
+function show(el){
+[startScreen,gameScreen,resultScreen].forEach(s=>s.classList.remove("active"));
+el.classList.add("active");
+}
+
+function setWeather(){
+const list=[
+{icon:"☀️",name:"晴れ",atk:35,def:15,bg:"linear-gradient(#42a5f5,#66bb6a)"},
+{icon:"🌧️",name:"雨",atk:20,def:30,bg:"linear-gradient(#607d8b,#263238)"},
+{icon:"❄️",name:"雪",atk:25,def:25,bg:"linear-gradient(#90caf9,#eceff1)"},
+{icon:"⚡",name:"雷",atk:45,def:10,bg:"linear-gradient(#512da8,#212121)"}
+];
+
+const w=list[Math.floor(Math.random()*list.length)];
+
+attackPoint=w.atk;
+guardPoint=w.def;
+
+weatherEl.textContent=w.icon+" "+w.name+
+"　攻撃+"+w.atk+" 防御+"+w.def;
+
+document.getElementById("arena").style.background=w.bg;
+}
+
+function startGame(){
+score=0;
+time=30;
+gameActive=true;
+scoreEl.textContent=0;
+timeEl.textContent=30;
+
+show(gameScreen);
+setWeather();
+
+timer=setInterval(()=>{
+time--;
+timeEl.textContent=time;
+
+if(time%8===0){
+setWeather();
+}
+
+if(time<=0){
+endGame();
+}
+},1000);
+
+nextBattle();
+}
+
+function nextBattle(){
+if(!gameActive)return;
+
+const delay=600+Math.random()*1200;
+
+eventTimer=setTimeout(()=>{
+if(Math.random()<0.5){
+action="attack";
+msg.textContent="⚔️ いまだ！攻撃！";
+hint.textContent="赤ボタンを押せ！";
+msg.style.color="#ffeb3b";
+}else{
+action="guard";
+msg.textContent="🛡️ あぶない！防御！";
+hint.textContent="青ボタンを押せ！";
+msg.style.color="#81d4fa";
+}
+
+setTimeout(()=>{
+if(!gameActive)return;
+
+if(action==="attack"){
+score-=15;
+msg.textContent="遅い！ -15";
+}
+if(action==="guard"){
+score-=15;
+msg.textContent="被弾！ -15";
+}
+
+scoreEl.textContent=score;
+action="none";
+hint.textContent="";
+
+setTimeout(nextBattle,500);
+
+},1100);
+
+},delay);
+}
+
+function attack(){
+if(!gameActive)return;
+
+if(action==="attack"){
+score+=attackPoint;
+msg.textContent="大成功！ +"+attackPoint;
+action="none";
+hint.textContent="";
+clearTimeout(eventTimer);
+setTimeout(nextBattle,400);
+}else{
+score-=10;
+msg.textContent="攻撃ミス！ -10";
+}
+scoreEl.textContent=score;
+}
+
+function guard(){
+if(!gameActive)return;
+
+if(action==="guard"){
+score+=guardPoint;
+msg.textContent="防御成功！ +"+guardPoint;
+action="none";
+hint.textContent="";
+clearTimeout(eventTimer);
+setTimeout(nextBattle,400);
+}else{
+score-=10;
+msg.textContent="防御ミス！ -10";
+}
+scoreEl.textContent=score;
+}
+
+function endGame(){
+gameActive=false;
+clearInterval(timer);
+clearTimeout(eventTimer);
+
+document.getElementById("finalScore").textContent=score;
+
+let rank="C";
+if(score>=500)rank="S";
+else if(score>=350)rank="A";
+else if(score>=220)rank="B";
+
+document.getElementById("rank").textContent=rank;
+
+show(resultScreen);
+}
+
+document.getElementById("startBtn").onclick=startGame;
+document.getElementById("retryBtn").onclick=startGame;
+document.getElementById("attack").onclick=attack;
+document.getElementById("guard").onclick=guard;
+
+["attack","guard"].forEach(id=>{
+document.getElementById(id).addEventListener("touchstart",e=>{
+e.preventDefault();
+if(id==="attack")attack();
+else guard();
+},{passive:false});
+});
+</script>
+
+</body>
+</html>
